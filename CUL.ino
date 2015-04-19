@@ -7,6 +7,7 @@
 static char inputBuffer[INPUT_BUFFER_SIZE];
 static unsigned int sendBuffer[SEND_BUFFER_SIZE];
 static int sendBufferPointer = 0;
+static unsigned int transmitPointer = 0;
 
 static void activityLed (byte on) {
   pinMode(LED_PIN, OUTPUT);
@@ -25,7 +26,7 @@ char readInput() {
 int
 fromhex(const char *in, unsigned char *out, int buflen)
 {
-  uint8_t *op = out, c, h = 0, fnd, step = 0;
+  unsigned char *op = out, c, h = 0, fnd, step = 0;
   while((c = *in++)) {
     fnd = 0;
     if(c >= '0' && c <= '9') { h |= c-'0';    fnd = 1; }
@@ -124,13 +125,75 @@ resetSendBuffer(char* in) {
 }
 
 /**
+ * Get the length of the next flank in the send buffer
+ */
+unsigned int
+getRawFlank(void) {
+  unsigned int result = 0;
+  // Check if it is a two byte value
+  if (sendBuffer[transmitPointer] == 255) {
+    // Yes, get the high byte first
+    transmitPointer++;
+    result = sendBuffer[transmitPointer++] << (8 + 4);
+  }
+  result += sendBuffer[transmitPointer++] << 4;
+  return result;
+}
+
+/**
  * Transmit the content of the sendBuffer via RF
  */
 void
 sendRawMessage(char* in) {
-  delay(500);
+  unsigned char repeat = 0;
+  unsigned char repeatCount;
+  unsigned char *t;
+  unsigned int pulseLength;
+  unsigned char onPeriod = 0;
+  unsigned char offPeriod = 0;
+  unsigned int repeatPointer = 0;
+  unsigned char repeatPoint = 0;
+  unsigned int pulseCounter = 0;
+  transmitPointer = 0;
+
+  // Get repeat count
+  fromhex(in + 1, &repeat, 1);
+
+  // Check if modulation period is specified
+  if (in[3] != 0) {
+    // Yes, it is. Read it.
+    fromhex(in + 3, &onPeriod, 1);
+    fromhex(in + 5, &offPeriod, 1);
+
+    // Check if repeat offset is specified
+    if (in[7] != 0) {
+      fromhex(in + 7, &repeatPoint, 1);
+    }
+  }
+
+  // Send the data from the transmit buffer "repeat" times
+  for (repeatCount = 0; repeatCount < repeat; repeatCount++) {
+    pulseCounter = 0;
+    for (transmitPointer = repeatPointer; transmitPointer < sendBufferPointer;) {
+      // Since a pulse in the transmit buffer may take one or three bytes depending
+      // on pulse length, we have to find on which transmit pointer position the
+      // repeat point really is. The repeatCounter counts number of pulses so we
+      // can find out when we have reached the repeat point and can save the
+      // repeat pointer position
+      if ((repeatCount == 0) && (pulseCounter == repeatPoint)) {
+        repeatPointer = transmitPointer;
+      }
+      // rf12_onOff(1);
+      activityLed(1);
+      delayMicroseconds(getRawFlank());
+      // rf12_onOff(0);
+      activityLed(0);
+      delayMicroseconds(getRawFlank());
+      pulseCounter += 2;
+    }
+  }
   Serial.print('o');
-  printhex(sendBufferPointer);
+  printhex(transmitPointer);
 }
 
 void setup() {
@@ -139,7 +202,6 @@ void setup() {
   // rf12_initialize(0, RF12_433MHZ);
   Serial.println("Initialized RF12");
 }
-
 
 void loop() {  
   char size = readInput();
