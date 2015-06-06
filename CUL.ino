@@ -1,8 +1,9 @@
 #include <JeeLib.h>
 
 #define SEND_BUFFER_SIZE 200
-#define INPUT_BUFFER_SIZE 200
+#define INPUT_BUFFER_SIZE 20
 #define LED_PIN 9
+#define FIRMWARE_VERSION "VOpenNetHome 0.2"
 
 static char inputBuffer[INPUT_BUFFER_SIZE];
 static unsigned int sendBuffer[SEND_BUFFER_SIZE];
@@ -16,7 +17,9 @@ static void activityLed (byte on) {
 
 char readInput() {
   while (Serial.available() == 0) ;
-  return Serial.readBytesUntil('\n', inputBuffer, INPUT_BUFFER_SIZE);
+  char result = Serial.readBytesUntil('\n', inputBuffer, INPUT_BUFFER_SIZE);
+  inputBuffer[result] = 0;
+  return result;
 }
 
 /*
@@ -111,7 +114,7 @@ addRawPulse(char *in) {
 }
 
 void printVersion() {
-  Serial.println("V 1.0 JeeLink");
+  Serial.println(FIRMWARE_VERSION);
 }
 
 /**
@@ -183,12 +186,12 @@ sendRawMessage(char* in) {
       if ((repeatCount == 0) && (pulseCounter == repeatPoint)) {
         repeatPointer = transmitPointer;
       }
-      // rf12_onOff(1);
+      rf12_onOff(1);
       activityLed(1);
-      delayMicroseconds(getRawFlank());
-      // rf12_onOff(0);
+      delayMicroseconds(getRawFlank() + 181);
+      rf12_onOff(0);
       activityLed(0);
-      delayMicroseconds(getRawFlank());
+      delayMicroseconds(getRawFlank()- 181);
       pulseCounter += 2;
     }
   }
@@ -197,10 +200,9 @@ sendRawMessage(char* in) {
 }
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println("RF Demo");
-  // rf12_initialize(0, RF12_433MHZ);
-  Serial.println("Initialized RF12");
+  Serial.begin(115200);
+  rf12_initialize(0, RF12_433MHZ);
+  printVersion();
 }
 
 void loop() {  
