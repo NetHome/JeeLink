@@ -3,7 +3,7 @@
 #define SEND_BUFFER_SIZE 200
 #define INPUT_BUFFER_SIZE 20
 #define LED_PIN 9
-#define FIRMWARE_VERSION "VOpenNetHome 0.2"
+#define FIRMWARE_VERSION "VOpenNetHome 0.3"
 
 static char inputBuffer[INPUT_BUFFER_SIZE];
 static unsigned int sendBuffer[SEND_BUFFER_SIZE];
@@ -201,7 +201,18 @@ sendRawMessage(char* in) {
 
 void setup() {
   Serial.begin(115200);
+  activityLed(1);
   rf12_initialize(0, RF12_433MHZ);
+  delay(100);
+  activityLed(0);
+  delay(200);
+  activityLed(1);
+  delay(100);
+  activityLed(0);
+  delay(200);
+  activityLed(1);
+  delay(100);
+  activityLed(0);  
   printVersion();
 }
 
